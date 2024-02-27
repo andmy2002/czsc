@@ -12,7 +12,7 @@ from czsc import Freq, RawBar
 from typing import List
 
 # 首次使用需要打开一个python终端按如下方式设置 token
-czsc.set_url_token(token='70c8cb11921bb24d06e0cad31b7706355af7cfd92810ad1165f0856e', url='http://api.tushare.pro')
+# czsc.set_url_token(token='70c8cb11921bb24d06e0cad31b7706355af7cfd92810ad1165f0856e', url='http://api.tushare.pro')
 
 cache_path = os.getenv("TS_CACHE_PATH", os.path.expanduser("~/.ts_data_cache"))
 dc = czsc.DataClient(url='http://api.tushare.pro', cache_path=cache_path)
