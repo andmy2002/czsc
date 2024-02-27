@@ -17,7 +17,7 @@ from typing import List
 from deprecated import deprecated
 from datetime import timedelta, datetime
 from czsc import envs
-from czsc.enum import Freq
+from czsc.enum_list import Freq
 from czsc.utils import io
 from czsc.data.ts import ts, pro, format_kline, dt_fmt, date_fmt
 

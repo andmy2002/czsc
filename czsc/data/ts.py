@@ -29,7 +29,7 @@ date_fmt = "%Y%m%d"
 
 
 class TushareProApi:
-    __token = ''
+    __token = '70c8cb11921bb24d06e0cad31b7706355af7cfd92810ad1165f0856e'
     __http_url = 'http://api.waditu.com'
 
     def __init__(self, token, timeout=30):

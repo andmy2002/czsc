@@ -14,7 +14,7 @@ from datetime import datetime
 from loguru import logger
 from deprecated import deprecated
 from typing import List, Callable, Dict
-from czsc.enum import Mark, Direction, Freq, Operate
+from czsc.enum_list import Mark, Direction, Freq, Operate
 from czsc.utils.corr import single_linear
 
 

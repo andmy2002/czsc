@@ -8,7 +8,7 @@ describe: 用于信号计算函数的各种辅助工具函数
 import numpy as np
 from collections import Counter, OrderedDict
 from typing import List, Any, Dict, Union, Tuple
-from czsc.enum import Direction
+from czsc.enum_list import Direction
 from czsc.objects import BI, RawBar, ZS, Signal
 
 

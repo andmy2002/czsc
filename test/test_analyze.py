@@ -4,7 +4,7 @@ import zipfile
 from tqdm import tqdm
 import pandas as pd
 from czsc.analyze import CZSC, RawBar, NewBar, remove_include, FX, check_fx, Direction, kline_pro
-from czsc.enum import Freq
+from czsc.enum_list import Freq
 from collections import OrderedDict
 
 

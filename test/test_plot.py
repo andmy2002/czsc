@@ -4,7 +4,7 @@ import pandas as pd
 import random
 from czsc.utils import echarts_plot as plot
 from czsc.analyze import CZSC, RawBar
-from czsc.enum import Freq
+from czsc.enum_list import Freq
 
 cur_path = os.path.split(os.path.realpath(__file__))[0]
 
