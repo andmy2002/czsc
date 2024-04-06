@@ -8,9 +8,10 @@ create_dt: 2021/7/16 11:51
 import os
 import time
 import dill
+import json
 import shutil
 import hashlib
-import json
+import inspect
 import pandas as pd
 from pathlib import Path
 from loguru import logger
@@ -54,13 +55,13 @@ class DiskCache:
         """判断缓存文件是否存在
 
         :param k: 缓存文件名
-        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx
+        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx, feather, parquet
         :param ttl: 缓存文件有效期，单位：秒，-1 表示永久有效
         :return: bool
         """
         file = self.path / f"{k}.{suffix}"
         if not file.exists():
-            logger.info(f"文件不存在, {file}")
+            logger.info(f"缓存文件不存在, {file}")
             return False
 
         if ttl > 0:
@@ -69,13 +70,14 @@ class DiskCache:
                 logger.info(f"缓存文件已过期, {file}")
                 return False
 
-        return file.exists()
+        logger.info(f"缓存文件已找到, {file}")
+        return True
 
     def get(self, k: str, suffix: str = "pkl") -> Any:
         """读取缓存文件
 
         :param k: 缓存文件名
-        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx
+        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx, feather, parquet
         :return: 缓存文件内容
         """
         file = self.path / f"{k}.{suffix}"
@@ -94,6 +96,10 @@ class DiskCache:
             res = pd.read_csv(file, encoding='utf-8')
         elif suffix == "xlsx":
             res = pd.read_excel(file)
+        elif suffix == "feather":
+            res = pd.read_feather(file)
+        elif suffix == "parquet":
+            res = pd.read_parquet(file)
         else:
             raise ValueError(f"suffix {suffix} not supported")
         return res
@@ -103,7 +109,7 @@ class DiskCache:
 
         :param k: 缓存文件名
         :param v: 缓存文件内容
-        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx
+        :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx, feather, parquet
         """
         file = self.path / f"{k}.{suffix}"
         if file.exists():
@@ -132,6 +138,16 @@ class DiskCache:
                 raise ValueError("suffix xlsx only support pd.DataFrame")
             v.to_excel(file, index=False)
 
+        elif suffix == "feather":
+            if not isinstance(v, pd.DataFrame):
+                raise ValueError("suffix feather only support pd.DataFrame")
+            v.to_feather(file)
+
+        elif suffix == "parquet":
+            if not isinstance(v, pd.DataFrame):
+                raise ValueError("suffix parquet only support pd.DataFrame")
+            v.to_parquet(file)
+
         else:
             raise ValueError(f"suffix {suffix} not supported")
 
@@ -143,25 +159,27 @@ class DiskCache:
         Path.unlink(file) if Path.exists(file) else None
 
 
-def disk_cache(path: str, suffix: str = "pkl", ttl: int = -1):
+def disk_cache(path: str = home_path, suffix: str = "pkl", ttl: int = -1):
     """缓存装饰器，支持多种数据格式
 
     :param path: 缓存文件夹路径
-    :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx
+    :param suffix: 缓存文件后缀，支持 pkl, json, txt, csv, xlsx, feather, parquet
     :param ttl: 缓存文件有效期，单位：秒
     """
-    assert suffix in ["pkl", "json", "txt", "csv", "xlsx"], "suffix not supported"
-
     def decorator(func):
         nonlocal path
         _c = DiskCache(path=Path(path) / func.__name__)
 
         def cached_func(*args, **kwargs):
+            # 如果函数有 ttl 参数，则使用函数的 ttl 参数
+            ttl1 = kwargs.pop("ttl", ttl)
+
             hash_str = f"{func.__name__}{args}{kwargs}"
-            k = hashlib.md5(hash_str.encode('utf-8')).hexdigest().upper()[:8]
+            code_str = inspect.getsource(func)
+            k = hashlib.md5((code_str + hash_str).encode('utf-8')).hexdigest().upper()[:8]
             k = f"{k}_{func.__name__}"
 
-            if _c.is_found(k, suffix=suffix, ttl=ttl):
+            if _c.is_found(k, suffix=suffix, ttl=ttl1):
                 output = _c.get(k, suffix=suffix)
                 return output
 

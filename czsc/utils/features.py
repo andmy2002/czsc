@@ -7,6 +7,7 @@ describe: 因子（特征）处理
 """
 import pandas as pd
 from loguru import logger
+from deprecated import deprecated
 from sklearn.preprocessing import scale
 from sklearn.linear_model import LinearRegression
 
@@ -70,7 +71,8 @@ def normalize_ts_feature(df, x_col, n=10, **kwargs):
     """
     assert df[x_col].nunique() > n, "因子值的取值数量必须大于分层数量"
     assert df[x_col].isna().sum() == 0, "因子有缺失值，缺失数量为：{}".format(df[x_col].isna().sum())
-    method = kwargs.get("method", "expanding")
+    method = kwargs.get("method", "rolling")
+    window = kwargs.get("window", 2000)
     min_periods = kwargs.get("min_periods", 300)
 
     if f"{x_col}_norm" not in df.columns:
@@ -79,15 +81,15 @@ def normalize_ts_feature(df, x_col, n=10, **kwargs):
                 lambda x: (x.iloc[-1] - x.mean()) / x.std(), raw=False)
 
         elif method == "rolling":
-            df[f"{x_col}_norm"] = df[x_col].rolling(min_periods=min_periods, window=min_periods).apply(
+            df[f"{x_col}_norm"] = df[x_col].rolling(min_periods=min_periods, window=window).apply(
                 lambda x: (x.iloc[-1] - x.mean()) / x.std(), raw=False)
 
         else:
             raise ValueError("method 必须为 expanding 或 rolling")
 
-        # 对于缺失值，获取原始值，然后进行标准化
-        na_x = df[df[f"{x_col}_norm"].isna()][x_col].values
-        df.loc[df[f"{x_col}_norm"].isna(), f"{x_col}_norm"] = na_x - na_x.mean() / na_x.std()
+        # # 对于缺失值，获取原始值，然后进行标准化
+        # na_x = df[df[f"{x_col}_norm"].isna()][x_col].values
+        df.loc[df[f"{x_col}_norm"].isna(), f"{x_col}_norm"] = 0
 
     if f"{x_col}_qcut" not in df.columns:
         if method == "expanding":
@@ -102,13 +104,14 @@ def normalize_ts_feature(df, x_col, n=10, **kwargs):
             raise ValueError("method 必须为 expanding 或 rolling")
 
         # 对于缺失值，获取原始值，然后进行分位数处理分层
-        na_x = df[df[f"{x_col}_qcut"].isna()][x_col].values
-        df.loc[df[f"{x_col}_qcut"].isna(), f"{x_col}_qcut"] = pd.qcut(na_x, q=n, labels=False, duplicates='drop', retbins=False)
+        # na_x = df[df[f"{x_col}_qcut"].isna()][x_col].values
+        # df.loc[df[f"{x_col}_qcut"].isna(), f"{x_col}_qcut"] = pd.qcut(na_x, q=n, labels=False, duplicates='drop', retbins=False)
+        # if df[f'{x_col}_qcut'].isna().sum() > 0:
+        #     logger.warning(f"因子 {x_col} 分层存在 {df[f'{x_col}_qcut'].isna().sum()} 个缺失值，已使用前值填充")
+        #     df[f'{x_col}_qcut'] = df[f'{x_col}_qcut'].ffill()
 
-        if df[f'{x_col}_qcut'].isna().sum() > 0:
-            logger.warning(f"因子 {x_col} 分层存在 {df[f'{x_col}_qcut'].isna().sum()} 个缺失值，已使用前值填充")
-            df[f'{x_col}_qcut'] = df[f'{x_col}_qcut'].ffill()
-
+        df[f"{x_col}_qcut"] = df[f"{x_col}_qcut"].fillna(-1)
+        # 第00层表示缺失值
         df[f'{x_col}分层'] = df[f'{x_col}_qcut'].apply(lambda x: f'第{str(int(x+1)).zfill(2)}层')
 
     return df
@@ -157,11 +160,14 @@ def feture_cross_layering(df, x_col, **kwargs):
     else:
         sorted_x = sorted(df[x_col].unique())
         df[f'{x_col}分层'] = df[x_col].apply(lambda x: sorted_x.index(x))
+
     df[f"{x_col}分层"] = df[f"{x_col}分层"].fillna(-1)
+    # 第00层表示缺失值
     df[f'{x_col}分层'] = df[f'{x_col}分层'].apply(lambda x: f'第{str(int(x+1)).zfill(2)}层')
     return df
 
 
+@deprecated(version='1.0', reason="禁止使用 expanding，推荐用 czsc.features.utils.rolling_rank 替代")
 def rolling_rank(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     """计算序列的滚动排名
 
@@ -186,6 +192,7 @@ def rolling_rank(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     df[new_col] = df[new_col].fillna(0)
 
 
+@deprecated(version='1.0', reason="禁止使用 expanding，推荐用 czsc.features.utils.rolling_norm 替代")
 def rolling_norm(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     """计算序列的滚动归一化值
 
@@ -211,6 +218,7 @@ def rolling_norm(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     df[new_col] = df[new_col].fillna(0)
 
 
+@deprecated(version='1.0', reason="禁止使用 expanding，推荐用 czsc.features.utils.rolling_qcut 替代")
 def rolling_qcut(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     """计算序列的滚动分位数
 
@@ -241,6 +249,7 @@ def rolling_qcut(df: pd.DataFrame, col, n=None, new_col=None, **kwargs):
     df[new_col] = df[new_col].fillna(-1)
 
 
+@deprecated(version='1.0', reason="禁止使用 expanding，推荐用 czsc.features.utils.rolling_qcut 替代")
 def rolling_compare(df, col1, col2, new_col=None, n=None, **kwargs):
     """计算序列的滚动归一化值
 

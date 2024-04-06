@@ -29,14 +29,24 @@ from czsc.traders import (
     SignalsParser,
     get_signals_config,
     get_signals_freqs,
+
     WeightBacktest,
+    stoploss_by_direction,
     get_ensemble_weight,
     long_short_equity,
+
     RedisWeightsClient,
+    get_strategy_mates,
+    get_heartbeat_time,
+    clear_strategy,
+    get_strategy_weights,
+
     OpensOptimize,
     ExitsOptimize,
 )
 from czsc.utils import (
+    format_standard_kline,
+
     KlineChart,
     WordWriter,
     BarGenerator,
@@ -70,8 +80,10 @@ from czsc.utils import (
     SignalPerformance,
     daily_performance,
     weekly_performance,
+    holds_performance,
     net_value_stats,
     subtract_fee,
+    top_drawdowns,
 
     home_path,
     DiskCache,
@@ -85,6 +97,9 @@ from czsc.utils import (
     DataClient,
     set_url_token,
     get_url_token,
+
+    optuna_study,
+    optuna_good_params,
 )
 
 # 交易日历工具
@@ -98,6 +113,7 @@ from czsc.utils.calendar import (
 # streamlit 量化分析组件
 from czsc.utils.st_components import (
     show_daily_return,
+    show_yearly_stats,
     show_splited_daily,
     show_monthly_return,
     show_correlation,
@@ -108,6 +124,11 @@ from czsc.utils.st_components import (
     show_weight_backtest,
     show_ts_rolling_corr,
     show_ts_self_corr,
+    show_stoploss_by_direction,
+    show_cointegration,
+    show_out_in_compare,
+    show_optuna_study,
+    show_drawdowns,
 )
 
 from czsc.utils.bi_info import (
@@ -119,17 +140,26 @@ from czsc.utils.features import (
     normalize_feature,
     normalize_ts_feature,
     feture_cross_layering,
+    find_most_similarity,
+)
+
+from czsc.features.utils import (
+    is_event_feature,
+    rolling_corr,
     rolling_rank,
     rolling_norm,
     rolling_qcut,
     rolling_compare,
-    find_most_similarity,
+    rolling_scale,
+    rolling_slope,
+    rolling_tanh,
+    feature_adjust,
 )
 
-__version__ = "0.9.41"
+__version__ = "0.9.46"
 __author__ = "zengbin93"
 __email__ = "zeng_bin8888@163.com"
-__date__ = "20240114"
+__date__ = "20240318"
 
 
 def welcome():
@@ -149,4 +179,4 @@ if envs.get_welcome():
 
 
 if get_dir_size(home_path) > pow(1024, 3):
-    print(f"{home_path} 目录缓存超过1GB，请适当清理。调用 czsc.empty_cache_path 可以直接清空缓存")
+    print(f"{home_path} 目录缓存超过1GB，请适当清理。调用 czsc.empty_cache_path() 可以直接清空缓存")

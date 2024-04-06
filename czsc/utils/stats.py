@@ -7,6 +7,7 @@ describe: 绩效表现统计
 """
 import numpy as np
 import pandas as pd
+from collections import Counter
 
 
 def cal_break_even_point(seq) -> float:
@@ -87,7 +88,7 @@ def daily_performance(daily_returns):
     daily_returns = np.array(daily_returns, dtype=np.float64)
 
     if len(daily_returns) == 0 or np.std(daily_returns) == 0 or all(x == 0 for x in daily_returns):
-        return {"年化": 0, "夏普": 0, "最大回撤": 0, "卡玛": 0, "日胜率": 0,
+        return {"绝对收益": 0, "年化": 0, "夏普": 0, "最大回撤": 0, "卡玛": 0, "日胜率": 0,
                 "年化波动率": 0, "非零覆盖": 0, "盈亏平衡点": 0, "新高间隔": 0, "新高占比": 0}
 
     annual_returns = np.sum(daily_returns) / len(daily_returns) * 252
@@ -100,14 +101,11 @@ def daily_performance(daily_returns):
     annual_volatility = np.std(daily_returns) * np.sqrt(252)
     none_zero_cover = len(daily_returns[daily_returns != 0]) / len(daily_returns)
 
-    # 计算最大新高时间
-    high_index = [i for i, x in enumerate(dd) if x == 0]
-    max_interval = 0
-    for i in range(len(high_index) - 1):
-        max_interval = max(max_interval, high_index[i + 1] - high_index[i])
+    # 计算最大新高间隔
+    max_interval = Counter(np.maximum.accumulate(cum_returns).tolist()).most_common(1)[0][1]
 
     # 计算新高时间占比
-    high_pct = len(high_index) / len(dd)
+    high_pct = len([i for i, x in enumerate(dd) if x == 0]) / len(dd)
 
     def __min_max(x, min_val, max_val, digits=4):
         if x < min_val:
@@ -119,6 +117,7 @@ def daily_performance(daily_returns):
         return round(x1, digits)
 
     sta = {
+        "绝对收益": round(np.sum(daily_returns), 4),
         "年化": round(annual_returns, 4),
         "夏普": __min_max(sharpe_ratio, -5, 5, 2),
         "最大回撤": round(max_drawdown, 4),
@@ -297,11 +296,13 @@ def evaluate_pairs(pairs: pd.DataFrame, trade_dir: str = "多空") -> dict:
         "持仓K线数": 0,
     }
 
-    if trade_dir in ["多头", "空头"]:
-        pairs = pairs[pairs["交易方向"] == trade_dir]
-
     if len(pairs) == 0:
         return p
+
+    if trade_dir in ["多头", "空头"]:
+        pairs = pairs[pairs["交易方向"] == trade_dir]
+        if len(pairs) == 0:
+            return p
 
     pairs = pairs.to_dict(orient='records')
     p['交易次数'] = len(pairs)
@@ -328,3 +329,76 @@ def evaluate_pairs(pairs: pd.DataFrame, trade_dir: str = "多空") -> dict:
         p["单笔盈亏比"] = round(p["单笔盈利"] / abs(p["单笔亏损"]), 4)
 
     return p
+
+
+def holds_performance(df, **kwargs):
+    """组合持仓权重表现
+
+    :param df: pd.DataFrame, columns=['dt', 'symbol', 'weight', 'n1b']
+        数据说明，dt: 交易时间，symbol: 标的代码，weight: 权重，n1b: 名义收益率
+        必须是每个时间点都有数据，如果某个时间点没有数据，可以增加一行数据，权重为0
+    :param kwargs:
+
+        - fee: float, 单边费率，BP
+        - digits: int, 保留小数位数
+
+    :return: pd.DataFrame, columns=['date', 'change', 'edge_pre_fee', 'cost', 'edge_post_fee']
+    """
+    fee = kwargs.get('fee', 15)
+    digits = kwargs.get('digits', 2)    # 保留小数位数
+
+    df = df.copy()
+    df['weight'] = df['weight'].round(digits)
+    df = df.sort_values(['dt', 'symbol']).reset_index(drop=True)
+
+    dft = pd.pivot_table(df, index='dt', columns='symbol', values='weight', aggfunc='sum').fillna(0)
+    df_turns = dft.diff().abs().sum(axis=1).reset_index()
+    df_turns.columns = ['date', 'change']
+    sdt = df['dt'].min()
+    df_turns.loc[(df_turns['date'] == sdt), 'change'] = df[df['dt'] == sdt]['weight'].sum()
+
+    df_edge = df.groupby('dt').apply(lambda x: (x['weight'] * x['n1b']).sum()).reset_index()
+    df_edge.columns = ['date', 'edge_pre_fee']
+    dfr = pd.merge(df_turns, df_edge, on='date', how='left')
+    dfr['cost'] = dfr['change'] * fee / 10000                       # 换手成本
+    dfr['edge_post_fee'] = dfr['edge_pre_fee'] - dfr['cost']        # 净收益
+    return dfr
+
+
+def top_drawdowns(returns: pd.Series, top: int = 10) -> pd.DataFrame:
+    """分析最大回撤，返回最大回撤的波峰、波谷、恢复日期、回撤天数、恢复天数
+
+    :param returns: pd.Series, 日收益率序列，index为日期
+    :param top: int, optional, 返回最大回撤的数量，默认10
+    :return: pd.DataFrame
+    """
+    returns = returns.copy()
+    df_cum = returns.cumsum()
+    underwater = df_cum - df_cum.cummax()
+
+    drawdowns = []
+    for _ in range(top):
+        valley = underwater.idxmin()  # end of the period
+        peak = underwater[:valley][underwater[:valley] == 0].index[-1]
+        try:
+            recovery = underwater[valley:][underwater[valley:] == 0].index[0]
+        except IndexError:
+            recovery = np.nan  # drawdown not recovered
+
+        # Slice out draw-down period
+        if not pd.isnull(recovery):
+            underwater.drop(underwater[peak:recovery].index[1:-1], inplace=True)
+        else:
+            # drawdown has not ended yet
+            underwater = underwater.loc[:peak]
+
+        drawdown = df_cum.loc[valley] - df_cum.loc[peak]
+
+        drawdowns.append((peak, valley, recovery, drawdown))
+        if (len(returns) == 0) or (len(underwater) == 0) or (np.min(underwater) == 0):
+            break
+
+    df_drawdowns = pd.DataFrame(drawdowns, columns=["回撤开始", "回撤结束", "回撤修复", "净值回撤"])
+    df_drawdowns['回撤天数'] = (df_drawdowns['回撤结束'] - df_drawdowns['回撤开始']).dt.days
+    df_drawdowns['恢复天数'] = (df_drawdowns['回撤修复'] - df_drawdowns['回撤结束']).dt.days
+    return df_drawdowns
