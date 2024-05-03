@@ -79,6 +79,7 @@ from czsc.utils import (
     SignalAnalyzer,
     SignalPerformance,
     daily_performance,
+    rolling_daily_performance,
     weekly_performance,
     holds_performance,
     net_value_stats,
@@ -88,6 +89,7 @@ from czsc.utils import (
     home_path,
     DiskCache,
     disk_cache,
+    clear_cache,
     get_dir_size,
     empty_cache_path,
     print_df_sample,
@@ -129,6 +131,7 @@ from czsc.utils.st_components import (
     show_out_in_compare,
     show_optuna_study,
     show_drawdowns,
+    show_rolling_daily_performance,
 )
 
 from czsc.utils.bi_info import (
@@ -154,12 +157,13 @@ from czsc.features.utils import (
     rolling_slope,
     rolling_tanh,
     feature_adjust,
+    normalize_corr,
 )
 
-__version__ = "0.9.46"
+__version__ = "0.9.48"
 __author__ = "zengbin93"
 __email__ = "zeng_bin8888@163.com"
-__date__ = "20240318"
+__date__ = "20240410"
 
 
 def welcome():
